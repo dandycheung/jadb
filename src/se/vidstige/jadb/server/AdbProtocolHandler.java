@@ -188,6 +188,9 @@ class AdbProtocolHandler implements Runnable {
                 case "LIST":
                     syncList(output, input, length);
                     break;
+                case "LIS2":
+                    syncListV2(output, input, length);
+                    break;
                 default:
                     throw new JadbException("Unknown sync id " + id);
             }
@@ -229,6 +232,15 @@ class AdbProtocolHandler implements Runnable {
             transport.sendDirectoryEntry(file);
         }
         transport.sendDirectoryEntryDone();
+    }
+
+    private void syncListV2(DataOutput output, DataInput input, int length) throws IOException, JadbException {
+        String remotePath = readString(input, length);
+        SyncTransport transport = getSyncTransport(output, input);
+        for (RemoteFile file : selected.list(remotePath)) {
+            transport.sendDirectoryEntryV2(file);
+        }
+        transport.sendDirectoryEntryDoneV2();
     }
 
     private String getCommandLength(String command) {

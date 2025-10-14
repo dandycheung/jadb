@@ -151,12 +151,35 @@ public class MockedTestCases {
         assertHasFile("\uB9AC\uADF8 \uC624\uBE0C \uB808\uC804\uB4DC", 240, 9001, files);
     }
 
+    @Test
+    public void testFileListV2() throws Exception {
+        server.add("serial-123");
+        server.expectList("serial-123", "/sdcard/Documents")
+                .withDir("school", 123456789)
+                .withDir("finances", 7070707)
+                .withDir("\u904A\u6232", 528491)
+                .withFile("user_manual.pdf", 3000, 648649)
+                .withFile("effective java vol. 7.epub", 0xCAFE, 0xBABE)
+                .withFile("\uB9AC\uADF8 \uC624\uBE0C \uB808\uC804\uB4DC", 240, 9001)
+                .withFile("big", Integer.MAX_VALUE + 1L, Integer.MAX_VALUE + 2L);
+        JadbDevice device = connection.getDevices().get(0);
+        List<RemoteFile> files = device.listV2("/sdcard/Documents");
+        Assert.assertEquals(7, files.size());
+        assertHasDir("school", 123456789, files);
+        assertHasDir("finances", 7070707, files);
+        assertHasDir("\u904A\u6232", 528491, files);
+        assertHasFile("user_manual.pdf", 3000, 648649, files);
+        assertHasFile("effective java vol. 7.epub", 0xCAFE, 0xBABE, files);
+        assertHasFile("\uB9AC\uADF8 \uC624\uBE0C \uB808\uC804\uB4DC", 240, 9001, files);
+        assertHasFile("big", Integer.MAX_VALUE + 1L, Integer.MAX_VALUE + 2L, files);
+    }
+
     private static long parseDate(String date) throws ParseException {
         DateFormat dateFormat = new SimpleDateFormat("yyyy-MM-dd HH:mm");
         return dateFormat.parse(date).getTime();
     }
 
-    private static void assertHasFile(String expPath, int expSize, long expModifyTime, List<RemoteFile> actualFiles) {
+    private static void assertHasFile(String expPath, long expSize, long expModifyTime, List<RemoteFile> actualFiles) {
         for (RemoteFile file : actualFiles) {
             if (expPath.equals(file.getPath())) {
                 if (file.isDirectory()) {

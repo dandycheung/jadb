@@ -174,6 +174,12 @@ public class JadbDevice {
         }
     }
 
+    /**
+     * <p>Lists all files of remotePath.</p>
+     *
+     * As a limitation it will not report {@link RemoteFile#getSize()} and {@link RemoteFile#getLastModified()} correct if they are too big (as the internal "LIST" command only uses ints internally).
+     * See {@link #listV2} for a better version.
+     */
     public List<RemoteFile> list(String remotePath) throws IOException, JadbException {
         try (Transport transport = getTransport()) {
             SyncTransport sync = transport.startSync();
@@ -181,6 +187,26 @@ public class JadbDevice {
 
             List<RemoteFile> result = new ArrayList<>();
             for (RemoteFileRecord dent = sync.readDirectoryEntry(); dent != RemoteFileRecord.DONE; dent = sync.readDirectoryEntry()) {
+                result.add(dent);
+            }
+            return result;
+        }
+    }
+
+    /**
+     * <p>Lists all files of remotePath.</p>
+     *
+     * <p>In contrast to {@link #list} it will report {@link RemoteFile#getSize()} and {@link RemoteFile#getLastModified()} correct even for big values (because it uses the newer "LIS2" command internally which supports longs instead of int).</p>
+     *
+     * Will only work on devices supporting the feature "ls_v2"
+     */
+    public List<RemoteFile> listV2(String remotePath) throws IOException, JadbException {
+        try (Transport transport = getTransport()) {
+            SyncTransport sync = transport.startSync();
+            sync.send("LIS2", remotePath);
+
+            List<RemoteFile> result = new ArrayList<>();
+            for (RemoteFileRecordV2 dent = sync.readDirectoryEntryV2(); dent != RemoteFileRecordV2.DONE; dent = sync.readDirectoryEntryV2()) {
                 result.add(dent);
             }
             return result;

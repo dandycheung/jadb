@@ -45,6 +45,10 @@ public class SyncTransport {
         return Integer.reverseBytes(input.readInt());
     }
 
+    private long readLong() throws IOException {
+        return Long.reverseBytes(input.readLong());
+    }
+
     private String readString(int length) throws IOException {
         byte[] buffer = new byte[length];
         input.readFully(buffer);
@@ -54,8 +58,8 @@ public class SyncTransport {
     public void sendDirectoryEntry(RemoteFile file) throws IOException {
         output.writeBytes("DENT");
         output.writeInt(Integer.reverseBytes(0666 | (file.isDirectory() ? (1 << 14) : 0)));
-        output.writeInt(Integer.reverseBytes(file.getSize()));
-        output.writeInt(Integer.reverseBytes(file.getLastModified()));
+        output.writeInt(Integer.reverseBytes((int)file.getSize()));
+        output.writeInt(Integer.reverseBytes((int)file.getLastModified()));
         byte[] pathChars = file.getPath().getBytes(StandardCharsets.UTF_8);
         output.writeInt(Integer.reverseBytes(pathChars.length));
         output.write(pathChars);
@@ -64,6 +68,33 @@ public class SyncTransport {
     public void sendDirectoryEntryDone() throws IOException {
         output.writeBytes("DONE");
         output.writeBytes("\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0"); // equivalent to the length of a "normal" dent
+    }
+
+    public void sendDirectoryEntryV2(RemoteFile file) throws IOException {
+        output.writeBytes("DNT2");
+        //20 unknown bytes
+        writeDummyBytes(20);
+        output.writeLong(Long.reverseBytes(0666 | (file.isDirectory() ? (1 << 14) : 0)));
+        writeDummyBytes(8);
+        output.writeLong(Long.reverseBytes(file.getSize()));
+        writeDummyBytes(8);
+        output.writeLong(Long.reverseBytes(file.getLastModified()));
+        writeDummyBytes(8);
+        byte[] pathChars = file.getPath().getBytes(StandardCharsets.UTF_8);
+        output.writeInt(Integer.reverseBytes(pathChars.length));
+        output.write(pathChars);
+    }
+
+    public void sendDirectoryEntryDoneV2() throws IOException {
+        output.writeBytes("DONE");
+        // equivalent to the length of a "normal" DNT2
+        writeDummyBytes(20 + 8 + 8 + 8 + 8 + 8 + 8 + 4);
+    }
+
+    private void writeDummyBytes(int countBytes) throws IOException {
+        for (int i=0;i<countBytes;i++) {
+            output.writeByte('\0');
+        }
     }
 
     public RemoteFileRecord readDirectoryEntry() throws IOException {
@@ -76,6 +107,33 @@ public class SyncTransport {
 
         if (!"DENT".equals(id)) return RemoteFileRecord.DONE;
         return new RemoteFileRecord(name, mode, size, time);
+    }
+
+    public RemoteFileRecordV2 readDirectoryEntryV2() throws IOException {
+        String id = readString(4);
+        //see https://github.com/cstyan/adbDocumentation?tab=readme-ov-file#adb-list
+        //After DNT2 there is 20 bytes of unknown data ( could be some extra file info that is undocumented )
+        skipBytes(20);
+
+        long mode = readLong();
+        //there is an extra added 8 bytes (which is undocumented )
+        skipBytes(8);
+        long size = readLong();
+        skipBytes(8);
+        long time = readLong();
+        skipBytes(8);
+
+        int nameLength = readInt();
+        String name = readString(nameLength);
+
+        if (!"DNT2".equals(id)) return RemoteFileRecordV2.DONE;
+        return new RemoteFileRecordV2(name, mode, size, time);
+    }
+
+    private void skipBytes(int countByes) throws IOException {
+        for (int i=0;i<countByes;i++) {
+            input.readByte();
+        }
     }
 
     private void sendChunk(byte[] buffer, int offset, int length) throws IOException {

@@ -71,6 +71,18 @@ public class RealDeviceTestCases {
     }
 
     @Test
+    public void testListFilesV2Twice() throws Exception {
+        JadbDevice any = jadb.getAnyDevice();
+        for (RemoteFile f : any.listV2("/")) {
+            System.out.println(f.getPath());
+        }
+
+        for (RemoteFile f : any.listV2("/")) {
+            System.out.println(f.getPath());
+        }
+    }
+
+    @Test
     public void testPushFile() throws Exception {
         JadbDevice any = jadb.getAnyDevice();
         any.push(new File("README.md"), new RemoteFile("/sdcard/README.md"));
